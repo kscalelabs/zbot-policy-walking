@@ -704,7 +704,7 @@ class SimpleSingleFootContactReward(ksim.Reward):
             is_zero_cmd = jnp.linalg.norm(traj.command[COMMAND_NAME][:, :3], axis=-1) < self.stand_still_threshold
             reward = jnp.where(is_zero_cmd, 1.0, single)
         else:
-            reward = single
+            reward = single.reshape((-1))
 
         return reward
 
