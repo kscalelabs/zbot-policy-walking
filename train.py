@@ -704,7 +704,7 @@ class SimpleSingleFootContactReward(ksim.Reward):
             is_zero_cmd = jnp.linalg.norm(traj.command[COMMAND_NAME][:, :3], axis=-1) < self.stand_still_threshold
             reward = jnp.where(is_zero_cmd, 1.0, single)
         else:
-            reward = single
+            reward = single.reshape((-1))
 
         return reward
 
@@ -885,12 +885,12 @@ class Actor(eqx.Module):
     input_proj: eqx.nn.Linear
     rnns: tuple[eqx.nn.GRUCell, ...]
     output_proj: eqx.nn.Linear
-    num_inputs: int = eqx.static_field()
-    num_outputs: int = eqx.static_field()
-    num_mixtures: int = eqx.static_field()
-    min_std: float = eqx.static_field()
-    max_std: float = eqx.static_field()
-    var_scale: float = eqx.static_field()
+    num_inputs: int = eqx.field(static=True)
+    num_outputs: int = eqx.field(static=True)
+    num_mixtures: int = eqx.field(static=True)
+    min_std: float = eqx.field(static=True)
+    max_std: float = eqx.field(static=True)
+    var_scale: float = eqx.field(static=True)
 
     def __init__(
         self,
@@ -1453,13 +1453,8 @@ class ZbotWalkingTask(ksim.PPOTask[ZbotWalkingTaskConfig]):
 
     def get_events(self, physics_model: ksim.PhysicsModel) -> list[ksim.Event]:
         return [
-            ksim.PushEvent(
-                x_linvel=0.1,
-                y_linvel=0.1,
-                z_linvel=0.05,
-                x_angvel=0.0,
-                y_angvel=0.0,
-                z_angvel=0.0,
+            ksim.LinearPushEvent(
+                linvel=0.1,
                 vel_range=(0.05, 0.15),
                 interval_range=(2.0, 4.0),
             ),
@@ -1728,7 +1723,7 @@ class ZbotWalkingTask(ksim.PPOTask[ZbotWalkingTaskConfig]):
 
             next_carry = jax.tree.map(
                 lambda x, y: jnp.where(transition.done, x, y),
-                self.get_initial_model_carry(rng),
+                self.get_initial_model_carry(model, rng),
                 (next_actor_carry, next_critic_carry),
             )
 
@@ -1738,7 +1733,7 @@ class ZbotWalkingTask(ksim.PPOTask[ZbotWalkingTaskConfig]):
 
         return ppo_variables, next_model_carry
 
-    def get_initial_model_carry(self, rng: PRNGKeyArray) -> tuple[Array, Array]:
+    def get_initial_model_carry(self, model: Model, rng: PRNGKeyArray) -> tuple[Array, Array]:
         return (
             jnp.zeros(shape=(self.config.depth, self.config.hidden_size)),
             jnp.zeros(shape=(self.config.depth, self.config.hidden_size)),
